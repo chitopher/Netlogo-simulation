@@ -1,0 +1,124 @@
+globals [num-soldiers num-militia helicopters]  ;; Track the number of soldiers, militia, and helicopters
+
+patches-own [terrain]  ;; each patch can represent either a road, building, or crash site
+turtles-own [role health]
+
+to setup
+  clear-all
+  setup-terrain
+  setup-agents
+  set num-soldiers num-soldiers-start  ;; Initialize num-soldiers based on slider
+  set num-militia num-militia-start    ;; Initialize num-militia based on slider
+  set helicopters 1                    ;; Set the initial number of helicopters (can adjust via sliders or code)
+  reset-ticks
+end
+
+to setup-terrain
+  ask patches [
+    if (random 100 < 70) [set terrain "road"]
+    if (random 100 < 10) [set terrain "building"]
+    if (pxcor = 5 and pycor = 5) [set terrain "crash site"] ;; Defining Crash Site at a specific location
+    recolor-patch
+  ]
+end
+
+to recolor-patch
+  if terrain = "road" [set pcolor gray]
+  if terrain = "building" [set pcolor brown]
+  if terrain = "crash site" [set pcolor red]
+end
+
+to setup-agents
+  ;; Create soldiers based on the value from the slider
+  create-turtles num-soldiers-start [
+    set role "soldier"
+    set color blue
+    setxy random-xcor random-ycor
+    set health 100
+  ]
+  
+  ;; Create militia based on the value from the slider
+  create-turtles num-militia-start [
+    set role "militia"
+    set color red
+    setxy random-xcor random-ycor
+    set health 100
+  ]
+end
+
+to go
+  ask turtles [
+    if role = "soldier" [move-to-crash-site]
+    if role = "militia" [random-move]
+    check-combat
+    check-health
+  ]
+  helicopter-attack  ;; Helicopters attack militia every tick
+  check-victory
+  tick
+end
+
+to move-to-crash-site
+  let target patch 5 5  ;; Crash site coordinates
+  face target
+  ifelse (distance target < 1) [
+    ;; Soldiers reach the crash site
+    set label "Rescue"
+  ] [
+    forward 1
+  ]
+end
+
+to random-move
+  right random 360
+  forward 1
+end
+
+to check-combat
+  let nearby-enemies turtles with [role != [role] of myself and distance myself < 2]
+  if any? nearby-enemies [
+    engage-combat nearby-enemies
+  ]
+end
+
+to engage-combat [nearby-enemies]
+  ask nearby-enemies [
+    set health health - random 10
+    if health <= 0 [die]
+  ]
+  set health health - random 10
+end
+
+to check-health
+  if health <= 0 [
+    if role = "soldier" [set num-soldiers num-soldiers - 1]
+    if role = "militia" [set num-militia num-militia - 1]
+    die
+  ]
+end
+
+;; Procedure for helicopter attacks, which remove 2 militia per tick
+to helicopter-attack
+  let militia-to-kill min list 2 num-militia  ;; Limit to a maximum of 2 militia per tick
+  ask n-of militia-to-kill turtles with [role = "militia"] [
+    set num-militia num-militia - 1
+    die  ;; Militia members are eliminated
+  ]
+end
+
+to check-victory
+  if num-soldiers = 0 [
+    user-message "Militia Wins!"
+    stop
+  ]
+  
+  if num-militia = 0 [
+    user-message "Soldiers Win!"
+    stop
+  ]
+  
+  if any? turtles with [role = "soldier" and patch-here = patch 5 5] [
+    user-message "Rescue Successful! Soldiers Win!"
+    stop
+  ]
+end
